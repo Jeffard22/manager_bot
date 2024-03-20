@@ -1,18 +1,25 @@
 import telebot
+from telebot import types
 import time
 from config import token_api
 from intro_text import intro_text
 import markups as mark
 import sqlite3
 
-my_id = "your ID in Telegram" # Ваш айди куда будет приходить сообщения с информацией о юзере и его заявке
+my_id = "742793551"  # Ваш айди куда будет приходить сообщения с информацией о юзере и его заявке
 
 
-def get_info_user(bot, message):  # функция для отправки информации о юзере в личку
-    bot.send_message(my_id, message.text + ' '
-                     + f'{message.chat.id}' + ' '
-                     + f'{message.from_user.first_name}' + ' '
-                     + f'{message.from_user.last_name}')
+def get_info_user(bot, message, contact_info=None):  # функция для отправки информации о юзере в личку
+    if contact_info:
+        bot.send_message(my_id, f"{message.text} {contact_info} "
+                         + f'{message.chat.id}' + ' '
+                         + f'{message.from_user.first_name}' + ' '
+                         + f'{message.from_user.last_name}')
+    else:
+        bot.send_message(my_id, f"{message.text} "
+                         + f'{message.chat.id}' + ' '
+                         + f'{message.from_user.first_name}' + ' '
+                         + f'{message.from_user.last_name}')
 
 
 def run_bot():
@@ -20,7 +27,7 @@ def run_bot():
 
     @bot.message_handler(commands=['start'])  # приветственная функция
     def send_welcome(message):
-        
+
         conn = sqlite3.connect('users_manager_bot.db')
         cur = conn.cursor()
         cur.execute("""CREATE TABLE IF NOT EXISTS users(
@@ -46,46 +53,18 @@ def run_bot():
 
     @bot.message_handler(content_types=['text'])
     def send_markup(message):
-        if message.text == 'Мне нужна другая программа':
+        if message.text == 'Мне нужна помощь, что-то сломалось или не работает':
             bot.send_message(message.chat.id, 'Хорошо! Опишите своими словами '
-                                              'что должна делать программа и в конце своего описания поставьте символ @ '
+                                              'что у вас случилось и в конце своего описания поставьте символ @ '
                                               '\nчто-бы я понял Вас.', reply_markup=mark.del_markup)
         elif '@' in message.text:
-            bot.send_message(message.chat.id, 'Спасибо, с Вами свяжутся в ближайшее время!',
+            bot.send_message(message.chat.id, 'Принято!',
                              reply_markup=mark.del_markup)
-            get_info_user(bot, message)
-
-        elif message.text == 'Мне нужен Чат-бот':
-            bot.send_message(message.chat.id, 'Хорошо! На сколько вопросов бот должен ответить?',
-                             reply_markup=mark.how_ques)
-
-        elif message.text == 'До 10 вопросов':
-            bot.send_message(message.chat.id, 'У бота должен быть дополнительный функционал? '
-                                              'Например сохранение или обработка данных?',
-                             reply_markup=mark.any_func)
-
-        elif message.text == 'От 10 до 20':
-            bot.send_message(message.chat.id, 'У бота должен быть дополнительный функционал? '
-                                              'Например сохранение или обработка данных?',
-                             reply_markup=mark.any_func)
-
-        elif message.text == 'Более 20':
-            bot.send_message(message.chat.id, 'У бота должен быть дополнительный функционал? '
-                                              'Например сохранение или обработка данных?',
-                             reply_markup=mark.any_func)
-
-        elif message.text == 'Будут доп. функции':
-            bot.send_message(message.chat.id, f'Благодарим за опрос, Ваша предварительная стоимость 1400 рублей.'
-                                              '\nЦена может варьироваться в зависимости от сложности Бота',
-                             reply_markup=mark.back_menu)
-            get_info_user(bot, message)
-
-        elif message.text == 'Нет сложных функций':
-            bot.send_message(message.chat.id, f'Благодарим за опрос, Ваша предварительная стоимость 1100 рублей.'
-                                              '\nЦена может варьироваться в зависимости от сложности Бота',
-                             reply_markup=mark.back_menu)
-            get_info_user(bot, message)
-
+            keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+            button = types.KeyboardButton(text="Отправить номер телефона", request_contact=True)
+            keyboard.add(button)
+            bot.send_message(message.chat.id, "Поделитесь своим номером телефона, нажав на кнопку ниже:",
+                             reply_markup=keyboard)
         elif message.text == 'Назад':
             img = open('title.jpg', 'rb')
             bot.send_photo(message.chat.id, img)
@@ -94,8 +73,21 @@ def run_bot():
         else:
             bot.send_message(message.chat.id, 'Я Вас не понял =(')
 
+    @bot.message_handler(content_types=['contact'])  # обработка контактов
+    def handle_contact(message):
+        bot.send_message(message.chat.id, 'Спасибо, с Вами свяжутся в ближайшее время!',
+                         reply_markup=mark.del_markup)
+        contact_info = f"{message.text} {message.contact.phone_number}" if message.contact else None
+        get_info_user(bot, message, contact_info)
+
+    @bot.message_handler(commands=['stop'])
+    def stop_bot(message):
+        global running
+        running = False
+        bot.send_message(message.chat.id, "Бот остановлен.")
+
     while True:  # функция для пулинга
-        print('=^.^=' ver 1.0) # информация о статусе бота в коммандной строке 
+        print('=^.^=', 'ver 1.0')  # информация о статусе бота в коммандной строке
 
         try:
             bot.polling(none_stop=True, interval=3, timeout=20)
